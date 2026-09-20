@@ -184,7 +184,8 @@ model and Hugging Face cache mounts, no Linux capabilities, and
 `no-new-privileges`. Only `.docker-cache/` (Triton/runtime caches) and
 `.docker-data/` (chat sessions) are writable. The separate download container
 has network access and a writable Hugging Face cache/model mount. Both run as
-the invoking host UID/GID.
+the invoking host UID/GID. Relative chat outputs such as `session.json` and
+`last_ids.safetensors` are written to the persistent `.docker-data/` mount.
 
 The native tuning defaults match `run-qwen38-exl3.sh`: 262,144-token Q8 KV
 cache, MTP depth 5 with dynamic stopping at confidence 0.6, and the ten GB10

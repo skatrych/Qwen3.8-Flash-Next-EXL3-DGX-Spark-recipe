@@ -41,7 +41,8 @@ case "$command_name" in
       -cs "${CONTEXT_SIZE:-262144}"
       -tps
     )
-    exec python examples/chat.py "${args[@]}" "$@"
+    cd /data
+    exec python /opt/exllamav3/examples/chat.py "${args[@]}" "$@"
     ;;
   doctor)
     exec exllamav3-doctor "$@"
