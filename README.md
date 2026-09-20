@@ -100,6 +100,7 @@ inference. Source and local-render notes are in [docs/README.md](docs/README.md)
 
 - [Current numbers](#current-numbers-2026-09-17)
 - [Which to use](#which-to-use)
+- [Quick start: Docker (native ExLlamaV3)](#quick-start-docker-native-exllamav3)
 - [Quick start: exllamav3 native](#quick-start-exllamav3-native)
 - [Quick start: vLLM path](#quick-start-vllm-path)
 - [Benchmarks: exllamav3 native](#benchmarks-exllamav3-native)
@@ -139,9 +140,74 @@ The **vLLM path** is for what needs vLLM specifically: its reasoning and
 tool-call parsers, structured output, tensor parallel across two Sparks,
 tooling that assumes a vLLM endpoint, and packs exllamav3 cannot run.
 
+## Quick start: Docker (native ExLlamaV3)
+
+This is the isolated version of the tuned native path and is the recommended
+way to run this recipe on a DGX Spark. The host needs Docker, Docker Compose,
+and NVIDIA Container Toolkit; it does not need Python, PyTorch, CUDA build
+tools, or ExLlamaV3 installed. The image builds the exact ExLlamaV3 commit used
+for the published measurements (`329e051385505b6ba981138d86a90bffe032c831`)
+against PyTorch 2.13.0 and CUDA 13.0.
+
+Build the image (the first build downloads the CUDA and PyTorch layers and
+compiles the SM 12.1 extension):
+
+```bash
+scripts/docker_native.sh build
+```
+
+Download the approximately 80 GB model pack through the container, then check
+GPU access and start the interactive chat. By default the download goes into
+the host's existing `~/.cache/huggingface` cache:
+
+```bash
+scripts/docker_native.sh download
+scripts/docker_native.sh doctor
+scripts/docker_native.sh run
+```
+
+Inference resolves `turboderp/Qwen3.8-Flash-Next-exl3` revision
+`3.05bpw_h5_ng5` from that cache without making a network request. To use a
+different Hugging Face cache, set `HF_CACHE_DIR`. To reuse an explicit model
+directory instead, set `MODEL_DIR`; the wrapper automatically switches to
+local-directory mode:
+
+```bash
+HF_CACHE_DIR=/mnt/cache/huggingface scripts/docker_native.sh run
+
+MODEL_DIR=/mnt/models/Qwen3.8-Flash-Next-EXL3 scripts/docker_native.sh doctor
+MODEL_DIR=/mnt/models/Qwen3.8-Flash-Next-EXL3 scripts/docker_native.sh run
+```
+
+The inference container has no network, a read-only root filesystem, read-only
+model and Hugging Face cache mounts, no Linux capabilities, and
+`no-new-privileges`. Only `.docker-cache/` (Triton/runtime caches) and
+`.docker-data/` (chat sessions) are writable. The separate download container
+has network access and a writable Hugging Face cache/model mount. Both run as
+the invoking host UID/GID.
+
+The native tuning defaults match `run-qwen38-exl3.sh`: 262,144-token Q8 KV
+cache, MTP depth 5 with dynamic stopping at confidence 0.6, and the ten GB10
+big cores. Environment variables expose the useful changes without rebuilding:
+
+```bash
+# Faster startup and lower memory use for a short session
+CONTEXT_SIZE=32768 scripts/docker_native.sh run
+
+# Single non-interactive prompt; extra arguments are passed to examples/chat.py
+scripts/docker_native.sh run -prompt "Write a Python merge sort"
+
+# Inspect every supported override
+scripts/docker_native.sh --help
+```
+
+`compose.yaml` is also usable directly. The wrapper is preferred because it
+creates the bind-mount directories and propagates the current UID/GID.
+
 ## Quick start: exllamav3 native
 
-The fastest path. No vLLM, no pack rewrites, no patches.
+The host-installed alternative. No vLLM or pack rewrites, but Python, PyTorch,
+CUDA build tools, and ExLlamaV3 are installed directly on the host.
 
 ### 1. Build exllamav3
 

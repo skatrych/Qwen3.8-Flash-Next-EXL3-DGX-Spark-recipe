@@ -7,5 +7,8 @@ models/
 *.jsonl
 .env
 .hf-token
+.docker-cache/
+.docker-data/
+.huggingface-cache/
 *.safetensors
 *.gguf

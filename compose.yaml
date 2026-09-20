@@ -1,0 +1,85 @@
+name: qwen38-exl3-native
+
+x-image: &image
+  image: qwen38-exl3-native:${IMAGE_TAG:-329e051}
+  build:
+    context: .
+    args:
+      CUDA_IMAGE: ${CUDA_IMAGE:-nvcr.io/nvidia/cuda:13.0.2-devel-ubuntu24.04@sha256:5dc1bca23d05bd37b011be68ec470c03b403a5da07ec3a86e41af9470e9d0cc6}
+      EXLLAMAV3_COMMIT: ${EXLLAMAV3_COMMIT:-329e051385505b6ba981138d86a90bffe032c831}
+      TORCH_VERSION: ${TORCH_VERSION:-2.13.0}
+
+x-security: &security
+  user: "${DOCKER_UID:-1000}:${DOCKER_GID:-1000}"
+  read_only: true
+  cap_drop:
+    - ALL
+  security_opt:
+    - no-new-privileges:true
+  init: true
+  tmpfs:
+    - /tmp:rw,nosuid,nodev,size=1g
+
+services:
+  native:
+    <<: [*image, *security]
+    network_mode: none
+    devices:
+      - nvidia.com/gpu=all
+    cpuset: ${CPUSET:-5-9,15-19}
+    stdin_open: true
+    tty: true
+    environment:
+      MODEL_PATH: /model
+      MODEL_SOURCE: ${MODEL_SOURCE:-cache}
+      HF_HOME: /huggingface
+      HF_HUB_OFFLINE: "1"
+      HF_REPO: ${HF_REPO:-turboderp/Qwen3.8-Flash-Next-exl3}
+      HF_REVISION: ${HF_REVISION:-3.05bpw_h5_ng5}
+      CONTEXT_SIZE: ${CONTEXT_SIZE:-262144}
+      CACHE_QUANT: ${CACHE_QUANT:-8,8}
+      NUM_DRAFT_TOKENS: ${NUM_DRAFT_TOKENS:-5}
+      DRAFT_CONFIDENCE: ${DRAFT_CONFIDENCE:-0.6}
+      PROMPT_MODE: ${PROMPT_MODE:-qwen35}
+      DROP_MODEL_CACHE: ${DROP_MODEL_CACHE:-1}
+      EXL3_INT8_GEMV: ${EXL3_INT8_GEMV:-0}
+      EXL3_MOE_COOP_WIDE: ${EXL3_MOE_COOP_WIDE:-1}
+      EXL3_GR_INT8: ${EXL3_GR_INT8:-1}
+      EXL3_MTP_HEAD_N: ${EXL3_MTP_HEAD_N:-65536}
+      EXL3_NGRAM_STREAM: ${EXL3_NGRAM_STREAM:-0}
+    volumes:
+      - type: bind
+        source: ${MODEL_DIR:-./models/Qwen3.8-Flash-Next-EXL3}
+        target: /model
+        read_only: true
+      - type: bind
+        source: ${CONTAINER_CACHE_DIR:-./.docker-cache}
+        target: /cache
+      - type: bind
+        source: ${CONTAINER_DATA_DIR:-./.docker-data}
+        target: /data
+      - type: bind
+        source: ${HF_CACHE_DIR:-./.huggingface-cache}
+        target: /huggingface
+        read_only: true
+
+  download:
+    <<: [*image, *security]
+    environment:
+      MODEL_PATH: /model
+      MODEL_SOURCE: ${MODEL_SOURCE:-cache}
+      HF_HOME: /huggingface
+      HF_REPO: ${HF_REPO:-turboderp/Qwen3.8-Flash-Next-exl3}
+      HF_REVISION: ${HF_REVISION:-3.05bpw_h5_ng5}
+      HF_TOKEN: ${HF_TOKEN:-}
+    volumes:
+      - type: bind
+        source: ${MODEL_DIR:-./models/Qwen3.8-Flash-Next-EXL3}
+        target: /model
+      - type: bind
+        source: ${CONTAINER_CACHE_DIR:-./.docker-cache}
+        target: /cache
+      - type: bind
+        source: ${HF_CACHE_DIR:-./.huggingface-cache}
+        target: /huggingface
+    command: ["download"]

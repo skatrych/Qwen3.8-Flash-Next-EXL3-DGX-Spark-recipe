@@ -1,0 +1,12 @@
+.git
+.docker-cache
+.docker-data
+.huggingface-cache
+.env
+.hf-token
+models
+results
+__pycache__
+*.pyc
+*.safetensors
+*.gguf
