@@ -7,6 +7,7 @@ x-image: &image
     args:
       CUDA_IMAGE: ${CUDA_IMAGE:-nvcr.io/nvidia/cuda:13.0.2-devel-ubuntu24.04@sha256:5dc1bca23d05bd37b011be68ec470c03b403a5da07ec3a86e41af9470e9d0cc6}
       EXLLAMAV3_COMMIT: ${EXLLAMAV3_COMMIT:-329e051385505b6ba981138d86a90bffe032c831}
+      TABBYAPI_COMMIT: ${TABBYAPI_COMMIT:-53da7919d4e45c63f4acbcbbc00cbe0f60a1ce65}
       TORCH_VERSION: ${TORCH_VERSION:-2.13.0}
 
 x-security: &security
@@ -83,3 +84,47 @@ services:
         source: ${HF_CACHE_DIR:-./.huggingface-cache}
         target: /huggingface
     command: ["download"]
+
+  serve:
+    <<: [*image, *security]
+    devices:
+      - nvidia.com/gpu=all
+    cpuset: ${CPUSET:-5-9,15-19}
+    shm_size: 8gb
+    ports:
+      - "${API_BIND_ADDRESS:-0.0.0.0}:${API_PORT:-5000}:5000"
+    environment:
+      MODEL_PATH: /model
+      MODEL_SOURCE: ${MODEL_SOURCE:-cache}
+      HF_HOME: /huggingface
+      HF_HUB_OFFLINE: "1"
+      HF_REPO: ${HF_REPO:-turboderp/Qwen3.8-Flash-Next-exl3}
+      HF_REVISION: ${HF_REVISION:-3.05bpw_h5_ng5}
+      CONTEXT_SIZE: ${CONTEXT_SIZE:-262144}
+      CACHE_QUANT: ${CACHE_QUANT:-8,8}
+      NUM_DRAFT_TOKENS: ${NUM_DRAFT_TOKENS:-5}
+      DRAFT_CONFIDENCE: ${DRAFT_CONFIDENCE:-0.6}
+      MAX_BATCH_SIZE: ${MAX_BATCH_SIZE:-4}
+      API_DISABLE_AUTH: ${API_DISABLE_AUTH:-false}
+      DROP_MODEL_CACHE: ${DROP_MODEL_CACHE:-1}
+      EXL3_INT8_GEMV: ${EXL3_INT8_GEMV:-0}
+      EXL3_MOE_COOP_WIDE: ${EXL3_MOE_COOP_WIDE:-1}
+      EXL3_GR_INT8: ${EXL3_GR_INT8:-1}
+      EXL3_MTP_HEAD_N: ${EXL3_MTP_HEAD_N:-65536}
+      EXL3_NGRAM_STREAM: ${EXL3_NGRAM_STREAM:-0}
+    volumes:
+      - type: bind
+        source: ${MODEL_DIR:-./models/Qwen3.8-Flash-Next-EXL3}
+        target: /model
+        read_only: true
+      - type: bind
+        source: ${CONTAINER_CACHE_DIR:-./.docker-cache}
+        target: /cache
+      - type: bind
+        source: ${CONTAINER_DATA_DIR:-./.docker-data}
+        target: /data
+      - type: bind
+        source: ${HF_CACHE_DIR:-./.huggingface-cache}
+        target: /huggingface
+        read_only: true
+    command: ["serve"]

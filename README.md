@@ -166,6 +166,37 @@ scripts/docker_native.sh doctor
 scripts/docker_native.sh run
 ```
 
+For an OpenAI-compatible API instead of the interactive chat, start the pinned
+TabbyAPI layer. This keeps the same native ExLlamaV3 engine, MTP drafting, and
+model selection:
+
+```bash
+API_PORT=8888 scripts/docker_native.sh serve
+```
+
+The endpoint is `http://<spark-ip>:8888/v1`. Authentication is enabled by
+default; TabbyAPI generates keys at first startup and persists them in
+`.docker-data/api_tokens.yml` without printing them to the container log. Use
+the `api_key` value as an OpenAI bearer token:
+
+```bash
+curl http://127.0.0.1:8888/v1/models \
+  -H "Authorization: Bearer <api_key>"
+
+curl http://127.0.0.1:8888/v1/chat/completions \
+  -H "Authorization: Bearer <api_key>" \
+  -H "Content-Type: application/json" \
+  -d '{"model":"Qwen3.8-Flash-Next-exl3","messages":[{"role":"user","content":"Hello"}],"max_tokens":64}'
+```
+
+The server listens on all host interfaces by default. Set
+`API_BIND_ADDRESS=127.0.0.1` to make it host-local (for example, when using an
+SSH tunnel). Setting `API_DISABLE_AUTH=true` is supported only for a trusted,
+isolated network. `MAX_BATCH_SIZE=4` is the default limit for concurrent
+generation streams; concurrent requests are continuously batched by
+ExLlamaV3. The configured KV cache is shared across active streams, so their
+combined live context must fit in `CONTEXT_SIZE`.
+
 Inference resolves `turboderp/Qwen3.8-Flash-Next-exl3` revision
 `3.05bpw_h5_ng5` from that cache without making a network request. To use a
 different Hugging Face cache, set `HF_CACHE_DIR`. To reuse an explicit model
@@ -179,13 +210,15 @@ MODEL_DIR=/mnt/models/Qwen3.8-Flash-Next-EXL3 scripts/docker_native.sh doctor
 MODEL_DIR=/mnt/models/Qwen3.8-Flash-Next-EXL3 scripts/docker_native.sh run
 ```
 
-The inference container has no network, a read-only root filesystem, read-only
-model and Hugging Face cache mounts, no Linux capabilities, and
-`no-new-privileges`. Only `.docker-cache/` (Triton/runtime caches) and
-`.docker-data/` (chat sessions) are writable. The separate download container
-has network access and a writable Hugging Face cache/model mount. Both run as
-the invoking host UID/GID. Relative chat outputs such as `session.json` and
-`last_ids.safetensors` are written to the persistent `.docker-data/` mount.
+The interactive inference container has no network. The API container exposes
+only its configured host port and disables remote URL fetching. Both use a
+read-only root filesystem, read-only model and Hugging Face cache mounts, no
+Linux capabilities, and `no-new-privileges`. Only `.docker-cache/`
+(Triton/runtime caches) and `.docker-data/` (chat sessions, API keys, and logs)
+are writable. The separate download container has network access and a writable
+Hugging Face cache/model mount. All containers run as the invoking host UID/GID.
+Relative chat outputs such as `session.json` and `last_ids.safetensors` are
+written to the persistent `.docker-data/` mount.
 
 The native tuning defaults match `run-qwen38-exl3.sh`: 262,144-token Q8 KV
 cache, MTP depth 5 with dynamic stopping at confidence 0.6, and the ten GB10

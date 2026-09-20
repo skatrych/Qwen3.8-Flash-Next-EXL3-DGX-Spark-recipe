@@ -41,6 +41,18 @@ RUN git clone https://github.com/vcruz305/exllamav3.git . \
     && printf '%s\n' "${EXLLAMAV3_COMMIT}" > /opt/exllamav3/EXLLAMAV3_COMMIT \
     && python -c 'from exllamav3 import ext; print("extension built:", ext.exllamav3_ext.__file__)'
 
+ARG TABBYAPI_COMMIT=53da7919d4e45c63f4acbcbbc00cbe0f60a1ce65
+COPY docker/tabbyapi-integration.patch /tmp/tabbyapi-integration.patch
+
+WORKDIR /opt/tabbyapi
+RUN git clone https://github.com/theroyallab/tabbyAPI.git . \
+    && git checkout --detach "${TABBYAPI_COMMIT}" \
+    && test "$(git rev-parse HEAD)" = "${TABBYAPI_COMMIT}" \
+    && git apply /tmp/tabbyapi-integration.patch \
+    && git remote remove origin \
+    && pip install . uvloop \
+    && printf '%s\n' "${TABBYAPI_COMMIT}" > /opt/tabbyapi/TABBYAPI_COMMIT
+
 COPY docker/entrypoint.sh /usr/local/bin/exllamav3-container
 COPY docker/doctor.py /usr/local/bin/exllamav3-doctor
 COPY docker/drop_model_cache.py /usr/local/bin/drop-model-cache

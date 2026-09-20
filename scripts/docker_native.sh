@@ -35,13 +35,15 @@ Commands:
   download    Download the model into the selected HF cache or local directory
   doctor      Verify CUDA, PyTorch, and the compiled ExLlamaV3 extension
   run         Start the interactive tuned chat; extra args go to chat.py
+  serve       Start the authenticated OpenAI-compatible API
   shell       Open a shell in the isolated inference container
 
 The default model source is the host Hugging Face cache at
 ~/.cache/huggingface. Setting MODEL_DIR automatically selects local-directory
 mode. Environment overrides also include HF_CACHE_DIR, MODEL_SOURCE,
-CONTEXT_SIZE, CACHE_QUANT, NUM_DRAFT_TOKENS, DRAFT_CONFIDENCE, CPUSET, and the
-EXL3_* tuning variables.
+CONTEXT_SIZE, CACHE_QUANT, NUM_DRAFT_TOKENS, DRAFT_CONFIDENCE, MAX_BATCH_SIZE,
+API_PORT, API_BIND_ADDRESS, API_DISABLE_AUTH, CPUSET, and the EXL3_* tuning
+variables.
 EOF
 }
 
@@ -65,6 +67,12 @@ case "$command_name" in
   run)
     prepare_mounts
     exec docker compose run --rm --no-deps native chat "$@"
+    ;;
+  serve)
+    prepare_mounts
+    echo "OpenAI-compatible API: http://${API_BIND_ADDRESS:-0.0.0.0}:${API_PORT:-5000}/v1" >&2
+    echo "API keys persist in $CONTAINER_DATA_DIR/api_tokens.yml" >&2
+    exec docker compose run --rm --no-deps --service-ports serve serve "$@"
     ;;
   shell)
     prepare_mounts

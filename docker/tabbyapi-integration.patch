@@ -1,0 +1,58 @@
+diff --git a/backends/exllamav3/model.py b/backends/exllamav3/model.py
+index 76c02b5..f706725 100644
+--- a/backends/exllamav3/model.py
++++ b/backends/exllamav3/model.py
+@@ -261,6 +261,7 @@ class ExllamaV3Container:
+             else None
+         )
+         self.dynamic_draft = draft_args.get("dynamic_draft", False)
++        self.draft_confidence = draft_args.get("draft_confidence", 0.4)
+ 
+         # Always disable draft if params are incorrectly configured
+         if draft_mode == "model" and draft_args and draft_model_name is None:
+@@ -821,6 +822,7 @@ class ExllamaV3Container:
+                 cpu_cache_size=config.memory.sysmem_kv_cache * 1024**2,
+                 num_draft_tokens=self.draft_num_tokens,
+                 dynamic_draft_tokens=self.dynamic_draft,
++                draft_confidence=self.draft_confidence,
+                 ngram_match_min=self.ngram_match_min,
+             )
+ 
+diff --git a/common/config_models.py b/common/config_models.py
+index abfe256..db77a17 100644
+--- a/common/config_models.py
++++ b/common/config_models.py
+@@ -577,6 +577,15 @@ class DraftModelConfig(BaseConfigModel):
+             "Ceiling is given by num_draft_tokens."
+         ),
+     )
++    draft_confidence: Optional[float] = Field(
++        0.4,
++        description=(
++            "Target acceptance probability used by dynamic drafting "
++            "(default: 0.4)."
++        ),
++        gt=0.0,
++        lt=1.0,
++    )
+     ngram_match_min: Optional[int] = Field(
+         2,
+         description=(
+diff --git a/common/auth.py b/common/auth.py
+index f5bbb87..01580cb 100644
+--- a/common/auth.py
++++ b/common/auth.py
+@@ -174,12 +174,7 @@ async def load_auth_keys(disable_from_config: bool):
+     if _watch_task is None:
+         _watch_task = asyncio.create_task(_watch_auth_file())
+ 
+-    logger.info(
+-        f"Your API key is: {_format_api_keys(AUTH_KEYS)}\n"
+-        f"Your admin key is: {AUTH_KEYS.admin_key}\n"
+-        "If these keys get compromised, make sure to delete api_tokens.yml "
+-        "and restart the server. Have fun!"
+-    )
++    logger.info(f"API authentication keys loaded from {AUTH_FILE}.")
+ 
+ 
+ def get_key_permission(request: Request):
